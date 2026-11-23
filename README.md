@@ -1,35 +1,35 @@
-# نظام إدارة تذاكر الدعم الفني (IT Service Desk) — WPF + SQL Server
+# IT Service Desk Management System (WPF + SQL Server)
 
-تطبيق سطح مكتب بلغة C# (.NET 8 / WPF) مع قاعدة بيانات Microsoft SQL Server لاستقبال طلبات الدعم الفني وتنظيمها وجدولتها ومتابعتها حتى الحل، مع لوحة إحصاءات ونظام لتقييم جودة الخدمة.
+A C# desktop application built with .NET 8 and WPF, backed by Microsoft SQL Server. It receives, prioritizes, assigns, tracks, and resolves support tickets, and includes statistics and service-quality evaluation.
 
-- **وثيقة التصميم الكاملة** (المعمارية، ERD، التعقيد الخوارزمي، المعادلات): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- **سكربت قاعدة البيانات:** [`database/ServiceDesk_Setup.sql`](database/ServiceDesk_Setup.sql)
+- **Full design document** (architecture, ERD, algorithmic complexity, and formulas): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- **Database script:** [`database/ServiceDesk_Setup.sql`](database/ServiceDesk_Setup.sql)
 
 ---
 
-## 1. المتطلبات
+## 1. Requirements
 
-| المكوّن | الإصدار |
+| Component | Version |
 |---|---|
-| نظام التشغيل | Windows 10 / 11 (WPF و DPAPI خاصّان بـ Windows) |
-| .NET SDK | 8.0 أو أحدث |
-| بيئة التطوير | Visual Studio 2022 (17.8+) مع حمولة ".NET desktop development"، أو `dotnet` CLI |
+| Operating system | Windows 10 / 11 (WPF and DPAPI are Windows-specific) |
+| .NET SDK | 8.0 or later |
+| Development environment | Visual Studio 2022 (17.8+) with the ".NET desktop development" workload, or `dotnet` CLI |
 | SQL Server | 2016+ / Express / Developer / LocalDB / Azure SQL |
-| أدوات اختيارية | SSMS أو Azure Data Studio أو `sqlcmd` |
+| Optional tools | SSMS, Azure Data Studio, or `sqlcmd` |
 
-حزم NuGet (تُستعاد تلقائيًا): `Microsoft.Data.SqlClient 5.2.2`، `System.Security.Cryptography.ProtectedData 8.0.0`، ولمشروع الاختبارات `xunit`.
+NuGet packages (restored automatically): `Microsoft.Data.SqlClient 5.2.2`, `System.Security.Cryptography.ProtectedData 8.0.0`, and `xunit` for the test project.
 
 ---
 
-## 2. خطوات الإعداد والتشغيل
+## 2. Setup and Run
 
-### الخطوة 1 — إنشاء قاعدة البيانات
+### Step 1: Create the database
 
-> ⚠️ السكربت يحذف قاعدة `ServiceDesk` إن وُجدت ثم يعيد إنشاءها.
+> The script drops the `ServiceDesk` database if it exists and recreates it.
 
-**على الجهاز نفسه (Localhost):**
+**On the local machine (localhost):**
 ```bat
-:: مثيل افتراضي
+:: Default instance
 sqlcmd -S localhost -E -C -i database\ServiceDesk_Setup.sql
 :: SQL Express
 sqlcmd -S .\SQLEXPRESS -E -C -i database\ServiceDesk_Setup.sql
@@ -37,24 +37,24 @@ sqlcmd -S .\SQLEXPRESS -E -C -i database\ServiceDesk_Setup.sql
 sqlcmd -S "(localdb)\MSSQLLocalDB" -E -i database\ServiceDesk_Setup.sql
 ```
 
-**على خادم بعيد (عنوان IP):**
+**On a remote server (IP address):**
 ```bat
-sqlcmd -S 192.168.1.50,1433 -U sa -P "<كلمة المرور>" -C -i database\ServiceDesk_Setup.sql
+sqlcmd -S 192.168.1.50,1433 -U sa -P "<password>" -C -i database\ServiceDesk_Setup.sql
 ```
 
-أو افتح الملف في SSMS واضغط **Execute**.
+Alternatively, open the script in SSMS and click **Execute**.
 
-### الخطوة 2 — (للاتصال عبر IP فقط) تجهيز الخادم البعيد
+### Step 2: Prepare a remote server (IP connections only)
 
-1. **SQL Server Configuration Manager** ← SQL Server Network Configuration ← فعّل **TCP/IP**، وثبّت المنفذ 1433 في IPAll، ثم أعد تشغيل الخدمة.
-2. افتح المنفذ في جدار الحماية على الخادم:
+1. In **SQL Server Configuration Manager**, open **SQL Server Network Configuration**, enable **TCP/IP**, set port 1433 in IPAll, and restart the service.
+2. Open port 1433 in the server firewall:
    ```powershell
    New-NetFirewallRule -DisplayName "SQL Server 1433" -Direction Inbound -Protocol TCP -LocalPort 1433 -Action Allow
    ```
-3. لاستخدام **SQL Authentication**: فعّل الوضع المختلط (Mixed Mode) من خصائص الخادم في SSMS، ويُفضّل إنشاء مستخدم بأقل صلاحيات (القسم 9 في نهاية السكربت).
-4. لاستخدام اسم مثيل دون منفذ: شغّل خدمة **SQL Server Browser** وافتح UDP 1434.
+3. For **SQL Authentication**, enable Mixed Mode in the server properties in SSMS. It is recommended to create a least-privilege user (see section 9 at the end of the script).
+4. To use an instance name without a port, run the **SQL Server Browser** service and open UDP 1434.
 
-### الخطوة 3 — البناء والتشغيل
+### Step 3: Build and run
 
 ```bat
 dotnet restore ServiceDesk.sln
@@ -62,83 +62,84 @@ dotnet build ServiceDesk.sln -c Release
 dotnet run --project src\ServiceDesk.Wpf
 dotnet test tests\ServiceDesk.Tests
 ```
-أو افتح `ServiceDesk.sln` في Visual Studio، واجعل `ServiceDesk.Wpf` مشروع البدء، ثم اضغط F5.
 
-### الخطوة 4 — أول تشغيل
+Alternatively, open `ServiceDesk.sln` in Visual Studio, set `ServiceDesk.Wpf` as the startup project, and press F5.
 
-1. تُفتح شاشة **Settings ← SQL Server connection** تلقائيًا (لا توجد إعدادات محفوظة بعد).
-2. اختر **Localhost** (ثم نوع المثيل) أو **Remote IP address** (العنوان + المنفذ)، ثم اسم القاعدة وطريقة المصادقة.
-3. اضغط **Test connection** ← يجب أن تظهر رسالة "Schema is ready".
-4. اضغط **Save & apply** (تُحفظ الإعدادات في `%AppData%\ServiceDesk\connection.json`، وكلمة مرور SQL مشفّرة بـ DPAPI).
+### Step 4: First launch
 
-> بعد الحفظ تصبح الإعدادات متاحة للمسؤول فقط.
+1. The **Settings -> SQL Server connection** screen opens automatically when no saved settings exist.
+2. Select **Localhost** (and its instance type) or **Remote IP address** (address and port), then choose the database name and authentication method.
+3. Click **Test connection**. The message should show **Schema is ready**.
+4. Click **Save & apply**. Settings are stored in `%AppData%\ServiceDesk\connection.json`, and the SQL password is encrypted with DPAPI.
 
-### الخطوة 5 — الدخول كمسؤول
+> After saving, the settings are available only to the administrator account.
 
-| الحقل | القيمة الافتراضية |
+### Step 5: Sign in as administrator
+
+| Field | Default value |
 |---|---|
 | Username | `admin` |
 | Password | `Admin@12345` |
 
-1. **غيّر كلمة المرور فورًا:** Settings ← My password.
-2. افتح **Statistics & evaluation** واضغط **Recalculate evaluations** مرة واحدة لتقييم التذاكر التجريبية المحلولة.
+1. Change the password immediately: **Settings -> My password**.
+2. Open **Statistics & evaluation** and click **Recalculate evaluations** once to evaluate the sample resolved tickets.
 
 ---
 
-## 3. دليل الاستخدام المختصر
+## 3. Quick Usage Guide
 
-### وضع المستخدم النهائي (دون كلمة مرور)
-- **Submit a ticket:** البيانات الشخصية، والفئة (تظهر حقول خاصة بالأجهزة أو البرمجيات أو الشبكات)، ودرجة الإلحاح والتأثير مع معاينة فورية للأولوية الناتجة ← يحصل المستخدم على رقم مثل `TKT-0000010`.
-- **Track my ticket:** إدخال الرقم + البريد معًا ← الحالة والـ SLA والتحديثات العامة وملاحظات الحل، مع تقييم الرضا (1–5) بعد الحل.
+### End-user mode (no password)
+- **Submit a ticket:** Enter personal details and a category (hardware, software, or network fields appear as applicable), choose urgency and impact, and preview the resulting priority immediately. The user receives a number such as `TKT-0000010`.
+- **Track my ticket:** Enter both the ticket number and email. View the status, SLA, public updates, resolution notes, and submit a satisfaction rating (1-5) after resolution.
 
-### وضع مسؤول تقنية المعلومات (بكلمة مرور)
-- **Queue & triage:** طابور مرتب حسب الاستراتيجية المختارة، ومرشحات (الحالة، الأولوية، الفئة، البحث، تذاكري فقط)، وتمييز لوني للتذاكر المتجاوزة والمعرّضة للخطر، وتحديث تلقائي كل 30 ثانية.
-  - **Receive next ticket:** يسحب أعلى تذكرة غير مُسندة من الكومة ويسندها إليك.
-  - الإجراءات: Claim، Start work، Pending، Escalate، Return to queue، Change priority، Add note (داخلية أو عامة)، Resolve & evaluate، Close، Reopen. الأزرار غير المسموحة في الحالة الحالية تُعطَّل تلقائيًا.
-  - سجل تدقيق كامل غير قابل للتعديل لكل تذكرة.
-- **Statistics & evaluation:** مؤشرات الأداء، وزمن الحل (المتوسط، الوسيط، الحد الأدنى، الحد الأقصى، P90، الانحراف المعياري)، ونسب الالتزام بالـ SLA، والتوزيعات، وتقييم كل تذكرة، والتصدير إلى CSV و JSON.
-- **Settings:** الاتصال بـ SQL، وجدول سياسات الـ SLA (قابل للتعديل)، وتغيير كلمة المرور.
+### IT administrator mode (password required)
+- **Queue & triage:** View a queue ordered according to the selected strategy, filter by status, priority, category, search, or my tickets, and highlight overdue or at-risk tickets. The queue refreshes every 30 seconds.
+  - **Receive next ticket:** Assigns the highest-priority unassigned ticket to you.
+  - Actions: Claim, Start work, Pending, Escalate, Return to queue, Change priority, Add note (internal or public), Resolve & evaluate, Close, and Reopen. Buttons that are not allowed for the current status are disabled automatically.
+  - Each ticket has a complete, immutable audit log.
+- **Statistics & evaluation:** Review performance metrics, resolution time (average, median, minimum, maximum, P90, and standard deviation), SLA compliance, distributions, individual ticket evaluations, and CSV/JSON exports.
+- **Settings:** Configure SQL connections and editable SLA policy rules, and change the password.
 
 ---
 
-## 4. هيكل الحل
+## 4. Solution Structure
 
 ```
 ServiceDesk.sln
-├── database/ServiceDesk_Setup.sql        DDL + فهارس + مشغّل منع التعديل + بيانات أولية
-├── docs/ARCHITECTURE.md                  وثيقة التصميم
+├── database/ServiceDesk_Setup.sql        DDL, indexes, update-prevention trigger, and seed data
+├── docs/ARCHITECTURE.md                  Design document
 ├── src/
-│   ├── ServiceDesk.Domain/               الكيانات، القواعد، الاستراتيجيات، المصنع، الخوارزميات
-│   ├── ServiceDesk.Application/          الخدمات، الواجهات المجردة، التجزئة، الإحصاء، التصدير
-│   ├── ServiceDesk.Data/                 ADO.NET، المستودعات، UoW، الإعدادات (Singleton)
-│   └── ServiceDesk.Wpf/                  Views، ViewModels، Converters، Styles، جذر التركيب
-└── tests/ServiceDesk.Tests/              اختبارات xUnit للمجال والخوارزميات والمعادلات
+│   ├── ServiceDesk.Domain/               Entities, rules, strategies, factory, and algorithms
+│   ├── ServiceDesk.Application/          Services, abstractions, hashing, statistics, and export
+│   ├── ServiceDesk.Data/                 ADO.NET, repositories, unit of work, and settings (Singleton)
+│   └── ServiceDesk.Wpf/                  Views, view models, converters, styles, and composition root
+└── tests/ServiceDesk.Tests/              xUnit tests for domain logic, algorithms, and formulas
 ```
 
 ---
 
-## 5. ميزات مقترحة للمرحلة التالية
+## 5. Planned Features
 
-| الميزة | القيمة | ملاحظة تنفيذية |
+| Feature | Value | Implementation note |
 |---|---|---|
-| إيقاف ساعة الـ SLA أثناء `Pending` + تقويم ساعات العمل والعطلات | قياس أعدل | جدول `BusinessCalendars` وحساب المدة الصافية |
-| إشعارات بالبريد (SMTP / Microsoft Graph) | إبلاغ المستخدم دون فتح التطبيق | Outbox Pattern لضمان الإرسال |
-| المرفقات (لقطات شاشة، سجلات) | تشخيص أسرع | `VARBINARY(MAX)` + FILESTREAM أو تخزين خارجي |
-| فرق دعم متعددة وتوجيه تلقائي حسب الفئة | توزيع حِمل | جدولا `Teams` و`CategoryRouting` |
-| قاعدة معرفة (Known Errors) | حل ذاتي وتقليل التذاكر | ربط `RootCause` بمقالات |
-| Full-Text Search | بحث O(log N) بدل المسح | `CREATE FULLTEXT INDEX` |
-| تسجيل الأحداث (Serilog) وحاوية DI | تشغيل ومراقبة أسهل | `Microsoft.Extensions.Hosting` |
-| واجهة عربية RTL كاملة | ملاءمة المستخدمين | ملفات `.resx` و`FlowDirection="RightToLeft"` |
-| قفل الحساب في قاعدة البيانات بدل الذاكرة | حماية تصمد بعد إعادة التشغيل | عمودا `FailedLogins` و`LockoutUntil` |
+| Pause the SLA clock while in `Pending`; add a business-hours calendar and holidays | More accurate measurement | `BusinessCalendars` table and net-duration calculation |
+| Email notifications (SMTP / Microsoft Graph) | Notify users without opening the application | Outbox pattern for reliable delivery |
+| Attachments (screenshots and logs) | Faster diagnosis | `VARBINARY(MAX)`, FILESTREAM, or external storage |
+| Multiple support teams with category-based automatic routing | Balanced workload | `Teams` and `CategoryRouting` tables |
+| Known-error knowledge base | Faster self-service and fewer tickets | Link `RootCause` to articles |
+| Full-text search | O(log N) search instead of a table scan | `CREATE FULLTEXT INDEX` |
+| Event logging (Serilog) and a DI container | Easier operation and monitoring | `Microsoft.Extensions.Hosting` |
+| Full Arabic RTL interface | Improved usability for Arabic users | `.resx` files and `FlowDirection="RightToLeft"` |
+| Database-backed account lockout instead of in-memory state | Protection that survives application restarts | `FailedLogins` and `LockoutUntil` columns |
 
 ---
 
-## 6. استكشاف الأخطاء
+## 6. Troubleshooting
 
-| العَرَض | السبب المرجّح | الحل |
+| Symptom | Likely cause | Solution |
 |---|---|---|
-| خطأ 53 / Server not reachable | TCP/IP معطّل أو جدار الحماية | الخطوة 2 |
-| خطأ 18456 / Login failed | بيانات خاطئة أو الوضع المختلط غير مفعّل | فعّل Mixed Mode أو استخدم Windows Auth |
-| خطأ في الشهادة (certificate chain) | Encrypt=Mandatory مع شهادة ذاتية التوقيع | فعّل "Trust server certificate" (للتطوير) |
-| "ServiceDesk tables were not found" | لم يُنفَّذ السكربت على القاعدة المختارة | الخطوة 1 |
-| "modified by another administrator" | تعارض تزامن مقصود | اضغط Refresh ثم أعد المحاولة |
+| Error 53 / Server not reachable | TCP/IP disabled or firewall blocked | Complete Step 2 |
+| Error 18456 / Login failed | Invalid credentials or Mixed Mode disabled | Enable Mixed Mode or use Windows Authentication |
+| Certificate error (certificate chain) | `Encrypt=Mandatory` with a self-signed certificate | Enable "Trust server certificate" for development |
+| "ServiceDesk tables were not found" | The script was not run against the selected database | Complete Step 1 |
+| "Modified by another administrator" | Intentional concurrency conflict | Click Refresh and retry |
