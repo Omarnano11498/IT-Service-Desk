@@ -1,0 +1,247 @@
+<UserControl x:Class="ServiceDesk.Wpf.Views.AdminQueueView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ===================== Toolbar: strategy + filters ===================== -->
+        <Border Style="{StaticResource Card}" Padding="12">
+            <WrapPanel>
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,3" Text="Ordering strategy"/>
+                    <ComboBox Width="290" ItemsSource="{Binding Strategies}" SelectedItem="{Binding SelectedStrategy}" DisplayMemberPath="Name"
+                              ToolTip="{Binding SelectedStrategy.Description}"/>
+                </StackPanel>
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,3" Text="Status"/>
+                    <ComboBox Width="130" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding StatusFilter}" DisplayMemberPath="Label"/>
+                </StackPanel>
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,3" Text="Priority"/>
+                    <ComboBox Width="120" ItemsSource="{Binding PriorityOptions}" SelectedItem="{Binding PriorityFilter}" DisplayMemberPath="Label"/>
+                </StackPanel>
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,3" Text="Category"/>
+                    <ComboBox Width="190" ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding CategoryFilter}" DisplayMemberPath="Label"/>
+                </StackPanel>
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,3" Text="Search (number, subject, requester) ⏎"/>
+                    <TextBox Width="220" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding RefreshCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                </StackPanel>
+                <StackPanel VerticalAlignment="Bottom" Margin="0,0,10,4">
+                    <CheckBox Content="Include resolved/closed" IsChecked="{Binding IncludeClosed}"/>
+                    <CheckBox Content="Only my tickets" IsChecked="{Binding OnlyMine}" Margin="0,4,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button Style="{StaticResource PrimaryButton}" Content="⬇ Receive next ticket" Command="{Binding ReceiveNextCommand}"
+                            ToolTip="Pops the top unclaimed ticket from a binary heap ordered by the selected strategy and assigns it to you."/>
+                    <Button Style="{StaticResource SecondaryButton}" Content="Refresh" Command="{Binding RefreshCommand}"/>
+                    <Button Style="{StaticResource SecondaryButton}" Content="Clear filters" Command="{Binding ClearFiltersCommand}"/>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- ===================== Info / alerts ===================== -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <Border Style="{StaticResource Badge}" Background="#DC2626" Margin="0,0,6,0">
+                    <TextBlock Style="{StaticResource BadgeText}"><Run Text="SLA breached: "/><Run Text="{Binding BreachedCount, Mode=OneWay}"/></TextBlock>
+                </Border>
+                <Border Style="{StaticResource Badge}" Background="#D97706" Margin="0,0,12,0">
+                    <TextBlock Style="{StaticResource BadgeText}"><Run Text="At risk (≥75% of SLA used): "/><Run Text="{Binding AtRiskCount, Mode=OneWay}"/></TextBlock>
+                </Border>
+                <TextBlock Style="{StaticResource Muted}" VerticalAlignment="Center" Text="{Binding SnapshotInfo}"/>
+            </StackPanel>
+            <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0" Text="{Binding LiveUpdate}" FontStyle="Italic"/>
+            <Border Style="{StaticResource ErrorBox}" Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVis}}">
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource Brush.Error}" TextWrapping="Wrap"/>
+            </Border>
+            <TextBlock Foreground="{StaticResource Brush.Success}" Text="{Binding StatusMessage}" Margin="0,4,0,0"
+                       Visibility="{Binding StatusMessage, Converter={StaticResource NullToVis}}"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="440"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ===================== Ordered queue ===================== -->
+            <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding NeedsAttention}" Value="True">
+                                <Setter Property="Background" Value="#FFF7ED"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding SlaState}" Value="Breached">
+                                <Setter Property="Background" Value="#FEF2F2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="#" Binding="{Binding Rank}" Width="40"/>
+                    <DataGridTextColumn Header="Ticket" Binding="{Binding TicketNumber}" Width="100"/>
+                    <DataGridTextColumn Header="Subject" Binding="{Binding Subject}" Width="2*"/>
+                    <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="*"/>
+                    <DataGridTemplateColumn Header="Priority" Width="85" SortMemberPath="Priority">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Badge}" Background="{Binding Priority, Converter={StaticResource BadgeBrush}}">
+                                    <TextBlock Style="{StaticResource BadgeText}" Text="{Binding Priority}"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Status" Width="95" SortMemberPath="Status">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Badge}" Background="{Binding Status, Converter={StaticResource BadgeBrush}}">
+                                    <TextBlock Style="{StaticResource BadgeText}" Text="{Binding Status, Converter={StaticResource EnumDisplay}}"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="SLA" Width="85" SortMemberPath="SlaState">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Badge}" Background="{Binding SlaState, Converter={StaticResource BadgeBrush}}">
+                                    <TextBlock Style="{StaticResource BadgeText}" Text="{Binding SlaState, Converter={StaticResource EnumDisplay}}"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Time left" Binding="{Binding RemainingText}" Width="80"/>
+                    <DataGridTextColumn Header="Age" Binding="{Binding AgeText}" Width="70"/>
+                    <DataGridTextColumn Header="Assigned" Binding="{Binding AssignedTo}" Width="*"/>
+                    <DataGridTextColumn Header="Score" Binding="{Binding Score}" Width="55"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- ===================== Triage detail ===================== -->
+            <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0">
+                <Grid>
+                    <TextBlock Style="{StaticResource Muted}" Text="Select a ticket to triage it."
+                               Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Margin="0,0,6,0">
+                            <WrapPanel>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="{Binding SelectedTicket.TicketNumber}" Margin="0,0,8,6"/>
+                                <Border Style="{StaticResource Badge}" Margin="0,0,4,6" Background="{Binding SelectedTicket.Status, Converter={StaticResource BadgeBrush}}">
+                                    <TextBlock Style="{StaticResource BadgeText}" Text="{Binding SelectedTicket.Status, Converter={StaticResource EnumDisplay}}"/>
+                                </Border>
+                                <Border Style="{StaticResource Badge}" Margin="0,0,4,6" Background="{Binding SelectedTicket.Priority, Converter={StaticResource BadgeBrush}}">
+                                    <TextBlock Style="{StaticResource BadgeText}" Text="{Binding SelectedTicket.Priority}"/>
+                                </Border>
+                                <Border Style="{StaticResource Badge}" Margin="0,0,4,6" Background="{Binding SelectedSlaState, Converter={StaticResource BadgeBrush}}">
+                                    <TextBlock Style="{StaticResource BadgeText}" Text="{Binding SelectedSlaState, Converter={StaticResource EnumDisplay}}"/>
+                                </Border>
+                            </WrapPanel>
+                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding SelectedTicket.Subject}"/>
+                            <TextBlock Style="{StaticResource Muted}">
+                                <Run Text="{Binding SelectedTicket.RequesterName, Mode=OneWay}"/><Run Text=" • "/><Run Text="{Binding SelectedTicket.RequesterEmail, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Style="{StaticResource Muted}">
+                                <Run Text="{Binding SelectedTicket.CategoryName, Mode=OneWay}"/><Run Text=" • Urgency "/><Run Text="{Binding SelectedTicket.Urgency, Mode=OneWay}"/><Run Text=" / Impact "/><Run Text="{Binding SelectedTicket.Impact, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Text="{Binding SelectedTicket.DetailsSummary}"/>
+                            <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Text="{Binding SelectedTicket.Description}"/>
+                            <Border Background="#EFF6FF" CornerRadius="6" Padding="8" Margin="0,8,0,0">
+                                <TextBlock TextWrapping="Wrap" FontSize="12">
+                                    <Run Text="Suggested first action: " FontWeight="SemiBold"/><Run Text="{Binding SelectedTicket.SuggestedFirstAction, Mode=OneWay}"/>
+                                </TextBlock>
+                            </Border>
+
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="135"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                <TextBlock Style="{StaticResource Muted}" Text="Created"/>
+                                <TextBlock Grid.Column="1" Text="{Binding SelectedTicket.CreatedAt, Converter={StaticResource UtcToLocal}}"/>
+                                <TextBlock Grid.Row="1" Style="{StaticResource Muted}" Text="First response"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedTicket.FirstResponseAt, Converter={StaticResource UtcToLocal}}"/>
+                                <TextBlock Grid.Row="2" Style="{StaticResource Muted}" Text="Response due"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedTicket.ResponseDueAt, Converter={StaticResource UtcToLocal}}"/>
+                                <TextBlock Grid.Row="3" Style="{StaticResource Muted}" Text="Resolution due"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedTicket.ResolutionDueAt, Converter={StaticResource UtcToLocal}}"/>
+                                <TextBlock Grid.Row="4" Style="{StaticResource Muted}" Text="Assigned to"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedTicket.AssignedAdminName, TargetNullValue='—'}"/>
+                            </Grid>
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,6,0,0" Text="{Binding AllowedTransitions}"/>
+
+                            <!-- Lifecycle actions -->
+                            <TextBlock Style="{StaticResource SectionTitle}" Margin="0,14,0,4" Text="Actions"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,3" Text="Note / reason (required for Pending, Escalate, Reopen)"/>
+                            <TextBox Style="{StaticResource MultiLine}" MinHeight="50" Text="{Binding ActionNote, UpdateSourceTrigger=PropertyChanged}" MaxLength="2000"/>
+                            <CheckBox Content="Internal note (hidden from requester)" IsChecked="{Binding NoteIsInternal}" Margin="0,4,0,6"/>
+                            <WrapPanel>
+                                <Button Style="{StaticResource PrimaryButton}" Content="Receive / claim" Margin="0,0,6,6" Command="{Binding ClaimCommand}"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Start work" Margin="0,0,6,6" Command="{Binding StartCommand}"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Pending" Margin="0,0,6,6" Command="{Binding PendingCommand}"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Escalate" Margin="0,0,6,6" Command="{Binding EscalateCommand}"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Return to queue" Margin="0,0,6,6" Command="{Binding ReturnCommand}"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Add note" Margin="0,0,6,6" Command="{Binding AddNoteCommand}"/>
+                                <Button Style="{StaticResource SuccessButton}" Content="Close" Margin="0,0,6,6" Command="{Binding CloseCommand}"/>
+                                <Button Style="{StaticResource DangerButton}" Content="Reopen" Margin="0,0,6,6" Command="{Binding ReopenCommand}"/>
+                            </WrapPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <ComboBox Width="120" ItemsSource="{Binding Priorities}" SelectedItem="{Binding NewPriority}" Margin="0,0,6,0"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Change priority" Command="{Binding ChangePriorityCommand}"/>
+                            </StackPanel>
+
+                            <TextBlock Style="{StaticResource SectionTitle}" Margin="0,14,0,4" Text="Resolution &amp; dispatch"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Margin="0,0,0,3" Text="Resolution notes (sent to the requester)"/>
+                            <TextBox Style="{StaticResource MultiLine}" Text="{Binding ResolutionNotes, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Root cause"/>
+                            <TextBox Text="{Binding RootCause, UpdateSourceTrigger=PropertyChanged}" MaxLength="1000"/>
+                            <Button Style="{StaticResource SuccessButton}" Content="✔ Resolve &amp; evaluate" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                    Command="{Binding ResolveCommand}"/>
+
+                            <Border Style="{StaticResource SuccessBox}" Visibility="{Binding Detail.Evaluation, Converter={StaticResource NullToVis}}">
+                                <TextBlock TextWrapping="Wrap">
+                                    <Run Text="Evaluation: " FontWeight="SemiBold"/>
+                                    <Run Text="{Binding Detail.Evaluation.OverallScore, Mode=OneWay}"/><Run Text="/100 ("/><Run Text="{Binding Detail.Evaluation.Grade, Mode=OneWay, Converter={StaticResource EnumDisplay}}"/><Run Text=") — speed "/>
+                                    <Run Text="{Binding Detail.Evaluation.SpeedScore, Mode=OneWay}"/><Run Text=", quality "/><Run Text="{Binding Detail.Evaluation.QualityScore, Mode=OneWay}"/>
+                                </TextBlock>
+                            </Border>
+
+                            <!-- Audit trail -->
+                            <TextBlock Style="{StaticResource SectionTitle}" Margin="0,14,0,4" Text="Audit trail"/>
+                            <ItemsControl ItemsSource="{Binding History}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,4">
+                                            <StackPanel>
+                                                <WrapPanel>
+                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Summary}"/>
+                                                    <Border Style="{StaticResource Badge}" Background="#475569" Margin="6,0,0,0"
+                                                            Visibility="{Binding IsInternal, Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock Style="{StaticResource BadgeText}" Text="internal"/>
+                                                    </Border>
+                                                </WrapPanel>
+                                                <TextBlock Style="{StaticResource Muted}" FontSize="11">
+                                                    <Run Text="{Binding OccurredAt, Mode=OneWay, Converter={StaticResource UtcToLocal}, ConverterParameter='yyyy-MM-dd HH:mm:ss'}"/><Run Text=" • "/><Run Text="{Binding PerformedByName, Mode=OneWay}"/>
+                                                </TextBlock>
+                                                <TextBlock TextWrapping="Wrap" Text="{Binding Notes}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ServiceDesk.Domain</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Persistence rehydrates entities through internal setters only (no public mutation of state). -->
+    <InternalsVisibleTo Include="ServiceDesk.Data" />
+    <InternalsVisibleTo Include="ServiceDesk.Tests" />
+  </ItemGroup>
+</Project>

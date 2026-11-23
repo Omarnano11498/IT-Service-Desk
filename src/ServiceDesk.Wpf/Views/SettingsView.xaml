@@ -1,0 +1,148 @@
+<UserControl x:Class="ServiceDesk.Wpf.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             DataContextChanged="OnDataContextChanged">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Bottom">
+            <Border Style="{StaticResource ErrorBox}" Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVis}}">
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource Brush.Error}" TextWrapping="Wrap"/>
+            </Border>
+            <TextBlock Foreground="{StaticResource Brush.Success}" Text="{Binding StatusMessage}" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <TabControl Background="Transparent" BorderThickness="0">
+            <!-- ===================== SQL Server connection ===================== -->
+            <TabItem Header="  SQL Server connection  ">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource Card}" MaxWidth="760" HorizontalAlignment="Left" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="Connection path"/>
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton GroupName="Mode" Content="Localhost / local instance" Margin="0,0,24,0"
+                                             IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=Localhost}"/>
+                                <RadioButton GroupName="Mode" Content="Remote IP address"
+                                             IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=IpAddress}"/>
+                            </StackPanel>
+
+                            <!-- Localhost -->
+                            <StackPanel Visibility="{Binding IsLocalhost, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Local instance type"/>
+                                <ComboBox Width="260" HorizontalAlignment="Left" ItemsSource="{Binding LocalKinds}" SelectedItem="{Binding LocalKind}"/>
+                                <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,3,0,0"
+                                           Text="DefaultInstance → localhost   •   NamedInstance → .\SQLEXPRESS   •   LocalDb → (localdb)\MSSQLLocalDB"/>
+                                <StackPanel Visibility="{Binding IsNamedInstance, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Instance name"/>
+                                    <TextBox Width="260" HorizontalAlignment="Left" Text="{Binding LocalInstanceName, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding IsLocalDb, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="LocalDB instance"/>
+                                    <TextBox Width="260" HorizontalAlignment="Left" Text="{Binding LocalDbInstance, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Remote IP -->
+                            <Grid Visibility="{Binding IsIp, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="220"/><ColumnDefinition Width="12"/><ColumnDefinition Width="100"/><ColumnDefinition Width="12"/><ColumnDefinition Width="200"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Server IP address"/>
+                                    <TextBox Text="{Binding IpAddress, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="TCP port"/>
+                                    <TextBox Text="{Binding PortText, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Instance (only if no port)"/>
+                                    <TextBox Text="{Binding RemoteInstanceName, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Style="{StaticResource SectionTitle}" Margin="0,16,0,4" Text="Database &amp; authentication"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Database name"/>
+                            <TextBox Width="260" HorizontalAlignment="Left" Text="{Binding Database, UpdateSourceTrigger=PropertyChanged}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <RadioButton GroupName="Auth" Content="Windows authentication" Margin="0,0,24,0"
+                                             IsChecked="{Binding Authentication, Converter={StaticResource EnumToBool}, ConverterParameter=Windows}"/>
+                                <RadioButton GroupName="Auth" Content="SQL Server authentication"
+                                             IsChecked="{Binding Authentication, Converter={StaticResource EnumToBool}, ConverterParameter=SqlServer}"/>
+                            </StackPanel>
+                            <Grid Visibility="{Binding IsSqlAuth, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="12"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Login"/>
+                                    <TextBox Text="{Binding UserName, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Password (stored encrypted with DPAPI)"/>
+                                    <PasswordBox x:Name="SqlPasswordBox" PasswordChanged="OnSqlPasswordChanged"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <CheckBox Content="Encrypt connection" IsChecked="{Binding Encrypt}" Margin="0,0,20,0"/>
+                                <CheckBox Content="Trust server certificate (dev / self-signed)" IsChecked="{Binding TrustServerCertificate}" Margin="0,0,20,0"/>
+                                <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBox Width="50" Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+
+                            <Border Background="#F8FAFC" CornerRadius="6" Padding="8" Margin="0,12,0,0">
+                                <TextBlock FontFamily="Consolas" Text="{Binding DataSourcePreview}" TextWrapping="Wrap"/>
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button Style="{StaticResource SecondaryButton}" Content="Test connection" Command="{Binding TestCommand}"/>
+                                <Button Style="{StaticResource PrimaryButton}" Content="Save &amp; apply" Command="{Binding SaveCommand}"/>
+                            </StackPanel>
+                            <Border CornerRadius="6" Padding="10" Margin="0,10,0,0"
+                                    BorderThickness="1" BorderBrush="{Binding TestSucceeded, Converter={StaticResource BadgeBrush}}"
+                                    Visibility="{Binding TestMessage, Converter={StaticResource NullToVis}}">
+                                <TextBlock Text="{Binding TestMessage}" TextWrapping="Wrap"/>
+                            </Border>
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,8,0,0" Text="{Binding SettingsFile, StringFormat='Settings file: {0}'}"/>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ===================== SLA policies ===================== -->
+            <TabItem Header="  SLA policies  " Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}">
+                <Border Style="{StaticResource Card}" MaxWidth="760" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Muted}" Text="Targets in minutes, measured from ticket creation (wall clock). Changes apply to new tickets and to tickets whose priority is changed."/>
+                        <DataGrid ItemsSource="{Binding SlaRows}" IsReadOnly="False" Margin="0,10,0,10" Width="640" HorizontalAlignment="Left">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Priority" Binding="{Binding Priority}" IsReadOnly="True" Width="100"/>
+                                <DataGridTextColumn Header="Response target (min)" Binding="{Binding ResponseMinutes, UpdateSourceTrigger=PropertyChanged}" Width="150"/>
+                                <DataGridTextColumn Header="Resolution target (min)" Binding="{Binding ResolutionMinutes, UpdateSourceTrigger=PropertyChanged}" Width="160"/>
+                                <DataGridTextColumn Header="Meaning" Binding="{Binding Summary}" IsReadOnly="True" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource SecondaryButton}" Content="Reload" Command="{Binding LoadSlaCommand}"/>
+                            <Button Style="{StaticResource PrimaryButton}" Content="Save SLA policies" Command="{Binding SaveSlaCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+
+            <!-- ===================== Password ===================== -->
+            <TabItem Header="  My password  " Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVis}}">
+                <Border Style="{StaticResource Card}" Width="380" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Muted}" Text="At least 10 characters with upper- and lower-case letters, a digit and a symbol."/>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Current password"/>
+                        <PasswordBox x:Name="CurrentPasswordBox" PasswordChanged="OnAdminPasswordChanged"/>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="New password"/>
+                        <PasswordBox x:Name="NewPasswordBox" PasswordChanged="OnAdminPasswordChanged"/>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Confirm new password"/>
+                        <PasswordBox x:Name="ConfirmPasswordBox" PasswordChanged="OnAdminPasswordChanged"/>
+                        <Button Style="{StaticResource PrimaryButton}" Content="Change password" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                Command="{Binding ChangePasswordCommand}"/>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</UserControl>
